@@ -1,0 +1,5 @@
+.cpcache
+.nrepl-port
+
+;; ignore input files
+resources
