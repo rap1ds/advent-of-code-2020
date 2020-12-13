@@ -9,3 +9,6 @@
   (-> file
       read
       (str/split-lines)))
+
+(defn read-bigints [file]
+  (map bigint (read-lines file)))
