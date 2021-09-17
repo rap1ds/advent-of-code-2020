@@ -12,3 +12,6 @@
 
 (defn read-bigints [file]
   (map bigint (read-lines file)))
+
+(defn read-longs [file]
+  (map #(Long/parseLong %) (read-lines file)))
