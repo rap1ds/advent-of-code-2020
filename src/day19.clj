@@ -53,22 +53,20 @@
 (defn valid-rule-coll? [rule message]
   (let [[first-rule & rest-rules] rule]
     (if (empty? rule)
-      (if (empty? message)
-        message
-        nil)
+      message
       (if-let [rest-message (valid-rule-set? first-rule message)]
         (recur rest-rules rest-message)
         nil))))
 
 (deftest valid-rule-coll-test
-  (is (= nil (valid-rule-coll? '() '(\a))))
+  (is (= '(\a) (valid-rule-coll? '() '(\a))))
   (is (= nil (valid-rule-coll? '(#{\a}) '())))
   (is (= '() (valid-rule-coll? '() '())))
   (is (= nil (valid-rule-coll? '(#{\b}) '(\a))))
   (is (= '() (valid-rule-coll? '(#{\a} #{\a}) '(\a \a))))
   (is (= nil (valid-rule-coll? '(#{\a} #{\b}) '(\a \a))))
   (is (= nil (valid-rule-coll? '(#{\a} #{\a} #{\b}) '(\a \a))))
-  (is (= nil (valid-rule-coll? '(#{\a}) '(\a \a)))))
+  (is (= '(\a) (valid-rule-coll? '(#{\a}) '(\a \a)))))
 
 (defn valid-rule? [rule message]
   (cond
@@ -87,7 +85,7 @@
   (is (= '() (valid-rule? '(#{\a} #{\a}) '(\a \a))))
   (is (= nil (valid-rule? '(#{\a} #{\b}) '(\a \a))))
   (is (= nil (valid-rule? '(#{\a} #{\a} #{\b}) '(\a \a))))
-  (is (= nil (valid-rule? '(#{\a}) '(\a \a)))))
+  (is (= '(\a) (valid-rule? '(#{\a}) '(\a \a)))))
 
 (defn valid-rule-set? [rule-set message]
   (if (empty? rule-set)
@@ -103,9 +101,8 @@
   (is (= nil (valid-rule-set? #{\a} '())))
   (is (= '() (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\a))))
   (is (= '() (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\b))))
-  (is (= nil (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\a \a))))
-  (is (= nil (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\b \b))))
-  (is (= nil (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\a \a))))
+  (is (= '(\a) (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\a \a))))
+  (is (= '(\b) (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\b \b))))
   (is (= '() (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a \a))))
   (is (= '() (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\b \b))))
   (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a \b))))
@@ -135,47 +132,31 @@
   (is (= false (valid? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a))))
   (is (= false (valid? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\b)))))
 
+(deftest example1-test
+  (is
+   (valid?
+    (denormalize-rule
+     0 (parse-rules
+        ["0: 4 1 5"
+         "1: 2 3 | 3 2"
+         "2: 4 4 | 5 5"
+         "3: 4 5 | 5 4"
+         "4: \"a\""
+         "5: \"b\""]))
+    (map identity "ababbb"))))
+
+(deftest part1
+  (is (= 168
+         (let [rule-0 (denormalize-rule
+                       0
+                       (rules)
+                       )]
+           (->> (messages)
+                (filter (partial valid? rule-0))
+                count)))))
+
 (comment
   (run-tests)
-
-  ;; examples
-  (valid?
-   (denormalize-rule
-    0 (parse-rules
-       ["0: 4 1 5"
-        "1: 2 3 | 3 2"
-        "2: 4 4 | 5 5"
-        "3: 4 5 | 5 4"
-        "4: \"a\""
-        "5: \"b\""]))
-   (map identity "ababbb"))
-
-  ;; part 1
-  (= 168
-     (let [rule-0 (denormalize-rule
-                   0
-                   (rules)
-                   )]
-       (->> (messages)
-            (filter (partial valid? rule-0))
-            count)))
-
-  ;; part 2
-  ;;
-  (let [rule-0 (denormalize-rule
-                0
-                (rules)
-
-
-                )]
-    )
-
-  ;; stack oveflow!
-  (denormalize-rule 0
-                    (-> (rules)
-                        (assoc 82 #{(list 42) (list 42 8)})
-                        (assoc 11 #{(list 42 31) (list 42 11 31)})
-                        ))
 
 
   )
