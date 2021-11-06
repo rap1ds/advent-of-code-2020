@@ -47,15 +47,14 @@
                    group))
             body)))))
 
+(declare valid-rule-ref?)
 
-(declare valid-rule-set?)
-
-(defn valid-rule-coll? [rule message]
-  (let [[first-rule & rest-rules] rule]
-    (if (empty? rule)
+(defn valid-rule-coll? [rule-coll rules message]
+  (let [[first-rule-ref & rest-rule-refs] rule-coll]
+    (if (empty? rule-coll)
       message
-      (if-let [rest-message (valid-rule-set? first-rule message)]
-        (recur rest-rules rest-message)
+      (if-let [rest-message (valid-rule-ref? first-rule-ref rules message)]
+        (recur rest-rule-refs rules rest-message)
         nil))))
 
 (deftest valid-rule-coll-test
@@ -68,51 +67,63 @@
   (is (= nil (valid-rule-coll? '(#{\a} #{\a} #{\b}) '(\a \a))))
   (is (= '(\a) (valid-rule-coll? '(#{\a}) '(\a \a)))))
 
-(defn valid-rule? [rule message]
-  (cond
-    (= \a rule (first message)) (rest message)
-    (= \b rule (first message)) (rest message)
-    (coll? rule) (valid-rule-coll? rule message)
-    :else nil))
+(defn valid-char-rule? [rule message]
+  (if (or (= \a rule (first message))
+          (= \b rule (first message)))
+    (rest message)
+    nil))
 
-(deftest valid-rule-test
-  (is (= '() (valid-rule? \a '(\a))))
-  (is (= nil (valid-rule? \b '(\a))))
-  (is (= '() (valid-rule? \b '(\b))))
-  (is (= nil (valid-rule? \a '(\b))))
-  (is (= '(\a) (valid-rule? \a '(\a \a))))
-
-  (is (= '() (valid-rule? '(#{\a} #{\a}) '(\a \a))))
-  (is (= nil (valid-rule? '(#{\a} #{\b}) '(\a \a))))
-  (is (= nil (valid-rule? '(#{\a} #{\a} #{\b}) '(\a \a))))
-  (is (= '(\a) (valid-rule? '(#{\a}) '(\a \a)))))
-
-(defn valid-rule-set? [rule-set message]
+(defn valid-rule-set? [rule-set rules message]
   (if (empty? rule-set)
     (if (empty? message)
       message
       nil)
-    (some #(valid-rule? % message) rule-set)))
+    (some #(valid-rule-coll? % rules message) rule-set)))
 
 (deftest valid-rule-set-test
-  (is (= '() (valid-rule-set? #{} '())))
-  (is (= '() (valid-rule-set? #{\a} '(\a))))
-  (is (= nil (valid-rule-set? #{} '(\a))))
-  (is (= nil (valid-rule-set? #{\a} '())))
-  (is (= '() (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\a))))
-  (is (= '() (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\b))))
-  (is (= '(\a) (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\a \a))))
-  (is (= '(\b) (valid-rule-set? #{'(#{\a}) '(#{\b})} '(\b \b))))
-  (is (= '() (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a \a))))
-  (is (= '() (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\b \b))))
-  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a \b))))
-  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a \b))))
-  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\a))))
-  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} '(\b)))))
+  (is (= '() (valid-rule-set? #{} {} '())))
+  (is (= '() (valid-rule-set? #{\a} {} '(\a))))
+  (is (= nil (valid-rule-set? #{} {} '(\a))))
+  (is (= nil (valid-rule-set? #{\a} {} '())))
+  (is (= '() (valid-rule-set? #{'(#{\a}) '(#{\b})} {} '(\a))))
+  (is (= '() (valid-rule-set? #{'(#{\a}) '(#{\b})} {} '(\b))))
+  (is (= '(\a) (valid-rule-set? #{'(#{\a}) '(#{\b})} {} '(\a \a))))
+  (is (= '(\b) (valid-rule-set? #{'(#{\a}) '(#{\b})} {} '(\b \b))))
+  (is (= '() (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} {} '(\a \a))))
+  (is (= '() (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} {} '(\b \b))))
+  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} {} '(\a \b))))
+  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} {} '(\a \b))))
+  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} {} '(\a))))
+  (is (= nil (valid-rule-set? #{'(#{\a} #{\a}) '(#{\b} #{\b})} {} '(\b)))))
 
-(defn valid? [rule-set message]
+(defn valid-rule? [rule rules message]
+  (cond
+    (char? rule) (valid-char-rule? rule message)
+    (set? rule) (valid-rule-set? rule rules message)
+    :else (throw (ex-info "Don't know how to handle rule" {:rule rule :message message}))))
+
+(deftest valid-rule-test
+  (is (= '() (valid-rule? \a {} '(\a))))
+  (is (= nil (valid-rule? \b {} '(\a))))
+  (is (= '() (valid-rule? \b {} '(\b))))
+  (is (= nil (valid-rule? \a {} '(\b))))
+  (is (= '(\a) (valid-rule? \a {} '(\a \a))))
+
+  (let [rules {}]
+    (is (= '() (valid-rule? '(#{1} #{1}) '(\a \a))))
+    (is (= nil (valid-rule? '(#{1} #{2}) '(\a \a))))
+    (is (= nil (valid-rule? '(#{1} #{3} #{\1}) '(\a \a))))
+    (is (= '(\a) (valid-rule? '(#{1}) '(\a \a))))))
+
+(defn valid-rule-ref? [rule-ref rules message]
+  (let [rule (get rules rule-ref)]
+    (assert rule "Couldn't find rule")
+
+    (valid-rule? rule rules message)))
+
+(defn valid? [rule-ref rules message]
   (boolean
-   (when-let [res (valid-rule-set? rule-set message)]
+   (when-let [res (valid-rule-ref? rule-ref rules message)]
      (empty? res))))
 
 (deftest valid-test
@@ -135,24 +146,20 @@
 (deftest example1-test
   (is
    (valid?
-    (denormalize-rule
-     0 (parse-rules
-        ["0: 4 1 5"
-         "1: 2 3 | 3 2"
-         "2: 4 4 | 5 5"
-         "3: 4 5 | 5 4"
-         "4: \"a\""
-         "5: \"b\""]))
+    0 (parse-rules
+       ["0: 4 1 5"
+        "1: 2 3 | 3 2"
+        "2: 4 4 | 5 5"
+        "3: 4 5 | 5 4"
+        "4: \"a\""
+        "5: \"b\""])
     (map identity "ababbb"))))
 
 (deftest part1
   (is (= 168
-         (let [rule-0 (denormalize-rule
-                       0
-                       (rules)
-                       )]
+         (let [rules* (rules)]
            (->> (messages)
-                (filter (partial valid? rule-0))
+                (filter (partial valid? 0 rules*))
                 count)))))
 
 (comment
